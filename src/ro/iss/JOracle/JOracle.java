@@ -2,7 +2,6 @@ package ro.iss.JOracle;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
-import java.util.concurrent.TimeUnit;
 
 import org.web3j.abi.EventEncoder;
 import org.web3j.abi.TypeReference;
@@ -20,8 +19,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import classes.HttpHelper;
-import classes.RONtoUSDOracle;
 import rx.Observable;
 import rx.Subscription;
 
@@ -45,20 +42,26 @@ public class JOracle
 		Credentials credentials = Credentials.create(args[1]);
 		System.out.println("[ETH-INFO] Credentials: " + credentials.getAddress());
 
+		// load the contract using the credentials
 		RONtoUSDOracle contract = RONtoUSDOracle.load(args[0], web3j, credentials, ManagedTransaction.GAS_PRICE, Contract.GAS_LIMIT);
 		System.out.println("[ETH-INFO] Loading contract: " + contract.getContractAddress());
 
+		// instantiate the monitored event
 		Event CALLBACKGETRONTOUSD_EVENT = new Event("CallbackGetRONtoUSD", Arrays.<TypeReference<?>>asList(), Arrays.<TypeReference<?>>asList());
 		;
+		// instantiate an EthFilter on the contract and add the event signature
 		EthFilter ethFilter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, contract.getContractAddress().substring(2));
 		// filter the contract log for the REQUESTIDEVENT_EVENT signature
 		ethFilter.addSingleTopic(EventEncoder.encode(CALLBACKGETRONTOUSD_EVENT));
 
+		// set an observable for with the filter
 		Observable<RONtoUSDOracle.CallbackGetRONtoUSDEventResponse> callbackEvent = contract.callbackGetRONtoUSDEventObservable(ethFilter);
+		// start monitoring
 		Subscription subscription = callbackEvent.subscribe(log -> {
 			String httpResponse = "";
 
 			try {
+				// get the currency rate
 				httpResponse = HttpHelper.get("http://data.fixer.io/api/latest?access_key=e4f3910a7cd92c94fbea2c69400d0a20&symbols=RON");
 				System.out.println("[GET-Request-INFO] Request response: " + httpResponse);
 
@@ -88,9 +91,9 @@ public class JOracle
 
 		}, Throwable::printStackTrace);
 
-		//
-		//TimeUnit.MINUTES.sleep(2);
-		//subscription.unsubscribe();
+		// In case you need to test the monitor for few minutes, uncomment next lines
+		// TimeUnit.MINUTES.sleep(2);
+		// subscription.unsubscribe();
 
 		System.out.println("TEST FINISHED");
 
